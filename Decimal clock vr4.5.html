@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Decimal Time & Calendar Widget</title>
+    <style>
+        body {
+            background: #0a0a0c;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            /* Cyberpunk scanline effect background */
+            background-image: linear-gradient(rgba(18, 18, 18, 0.9) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+        }
+        .widget {
+            text-align: center;
+            background: rgba(20, 20, 25, 0.85);
+            padding: 40px;
+            border-radius: 4px; /* Hard angles fit cyberpunk better */
+            box-shadow: 0px 0px 30px rgba(0, 255, 204, 0.15), inset 0 0 15px rgba(0, 255, 204, 0.05);
+            border: 2px solid #00ffcc;
+            min-width: 360px;
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%); /* Angular corner cut */
+        }
+        /* Decorative corner element */
+        .widget::before {
+            content: "SYS.STATUS: ACTIVE";
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: #0a0a0c;
+            padding: 0 5px;
+            font-size: 0.6rem;
+            color: #ff0055;
+            letter-spacing: 1px;
+        }
+        .label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .time {
+            font-size: 4.2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-shadow: 0 0 10px rgba(0, 255, 204, 0.6), 0 0 20px rgba(0, 255, 204, 0.2);
+            color: #00ffcc;
+        }
+        .divider {
+            border-top: 2px dashed rgba(51, 51, 51, 0.6);
+            margin: 25px 0;
+            position: relative;
+        }
+        .date {
+            font-size: 1.3rem;
+            color: #ff0055;
+            text-shadow: 0 0 8px rgba(255, 0, 53, 0.4);
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+        /* Season Tracker Interface */
+        .season-container {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 2px;
+        }
+        .season-text {
+            font-size: 1.1rem;
+            color: #ff9900;
+            text-shadow: 0 0 8px rgba(255, 153, 0, 0.4);
+            margin-bottom: 10px;
+        }
+        
+        /* Unified Progress Bar Layout Styles */
+        .progress-bar-bg {
+            background: #222;
+            height: 6px;
+            width: 100%;
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+        /* Layout tweaks for time and calendar modules */
+        .time-container {
+            margin-bottom: 25px;
+        }
+        .calendar-container {
+            margin-bottom: 25px;
+        }
+
+        /* Color Customizations for Progress Bars */
+        .time-fill {
+            background: linear-gradient(90deg, #00aa88, #00ffcc);
+            height: 100%;
+            width: 0%;
+            box-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+        }
+        .calendar-fill {
+            background: linear-gradient(90deg, #aa0038, #ff0055);
+            height: 100%;
+            width: 0%;
+            box-shadow: 0 0 8px rgba(255, 0, 85, 0.6);
+        }
+        .season-fill {
+            background: linear-gradient(90deg, #ff9900, #ff0055);
+            height: 100%;
+            width: 0%; 
+            box-shadow: 0 0 8px rgba(255, 153, 0, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="widget">
+        <div class="label" id="time-label">Decimal_Time [0%]</div>
+        <div class="time-container">
+            <div class="time" id="clock">0:00:00</div>
+            <div class="progress-bar-bg">
+                <div class="time-fill" id="time-progress"></div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="label" id="calendar-label">10_Month_Calendar [0%]</div>
+        <div class="calendar-container">
+            <div class="date" id="calendar">CORE.SYS_LOADING...</div>
+            <div class="progress-bar-bg">
+                <div class="calendar-fill" id="calendar-progress"></div>
+            </div>
+        </div>
+
+        <div class="season-container">
+            <div class="label">Macro_Season_Engine</div>
+            <div class="season-text" id="season-name">Calculating...</div>
+            <div class="progress-bar-bg">
+                <div class="season-fill" id="season-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const monthDetails = [
+            { name: "Primus", days: 37 },
+            { name: "Secundus", days: 36 },
+            { name: "Tertius", days: 37 },
+            { name: "Quartus", days: 36 },
+            { name: "Quintilis", days: 37 },
+            { name: "Sextilis", days: 36 },
+            { name: "September", days: 37 },
+            { name: "October", days: 36 },
+            { name: "November", days: 37 },
+            { name: "December", days: 36 } 
+        ];
+
+        function isLeapYear(year) {
+            return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+        }
+
+        function getDayOfYear(date) {
+            const start = Date.UTC(date.getFullYear(), 0, 0);
+            const target = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor((target - start) / oneDay);
+        }
+
+        function updateWidget() {
+            const now = new Date();
+            const currentYear = now.getFullYear();
+
+            // --- 1. CLOCK ENGINE ---
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            const ms = now.getMilliseconds();
+
+            const totalStandardSeconds = (hours * 3600) + (minutes * 60) + seconds + (ms / 1000);
+            const totalDecimalSeconds = (totalStandardSeconds / 86400) * 100000;
+
+            const decimalHours = Math.floor(totalDecimalSeconds / 10000);
+            const decimalMinutes = Math.floor((totalDecimalSeconds % 10000) / 100);
+            const decimalSeconds = Math.floor(totalDecimalSeconds % 100);
+
+            const padMins = String(decimalMinutes).padStart(2, '0');
+            const padSecs = String(decimalSeconds).padStart(2, '0');
+
+            document.getElementById('clock').innerText = `${decimalHours}:${padMins}:${padSecs}`;
+          
+	// Time bar tracks progression through the current decimal day (0% to 100%)  
+            const dayProgressPercentage = (totalDecimalSeconds / 100000) * 100;
+            document.getElementById('time-progress').style.width = `${dayProgressPercentage}%`;
+            document.getElementById('time-label').innerText = `Decimal Time [${Math.floor(dayProgressPercentage)}%]`;
+
+            // --- 2. CALENDAR ENGINE ---
+            let dayOfYear = getDayOfYear(now);
+            const totalDaysInYear = isLeapYear(currentYear) ? 366 : 365;
+
+            let decimalMonth = "";
+            let decimalDay = 0;
+            let accumulatedDays = 0;
+            let currentMonthMaxDays = 0;
+
+            for (let i = 0; i < monthDetails.length; i++) {
+                let currentMonthDays = monthDetails[i].days;
+                if (i === 9 && isLeapYear(currentYear)) {
+                    currentMonthDays = 37;
+                }
+
+                if (dayOfYear <= accumulatedDays + currentMonthDays) {
+                    decimalMonth = monthDetails[i].name;
+                    decimalDay = dayOfYear - accumulatedDays;
+                    currentMonthMaxDays = currentMonthDays;
+                    break;
+                }
+                accumulatedDays += currentMonthDays;
+            }
+
+            if (currentMonthMaxDays > 0) {
+                const monthProgressPercentage = (decimalDay / currentMonthMaxDays) * 100;
+                
+                document.getElementById('calendar').innerText = `${decimalDay} ${decimalMonth}, Year ${currentYear}`;
+                document.getElementById('calendar-progress').style.width = `${monthProgressPercentage}%`;
+                document.getElementById('calendar-label').innerText = `10-Month Calendar [${Math.floor(monthProgressPercentage)}%]`;
+            }
+
+            // --- 3. MACRO-SEASON ENGINE ---
+            let seasonName = "Winter";
+            let seasonProgress = 0;
+
+            if (dayOfYear >= 79 && dayOfYear < 172) {
+                seasonName = "🌸 SPRING_CYCLE";
+                seasonProgress = ((dayOfYear - 79) / (172 - 79)) * 100;
+            } else if (dayOfYear >= 172 && dayOfYear < 265) {
+                seasonName = "☀️ SUMMER_CYCLE";
+                seasonProgress = ((dayOfYear - 172) / (265 - 172)) * 100;
+            } else if (dayOfYear >= 265 && dayOfYear < 355) {
+                seasonName = "🍂 AUTUMN_CYCLE";
+                seasonProgress = ((dayOfYear - 265) / (355 - 265)) * 100;
+            } else {
+                seasonName = "❄️ WINTER_CYCLE";
+                let winterDays = dayOfYear >= 355 ? dayOfYear - 355 : dayOfYear + (totalDaysInYear - 355);
+                seasonProgress = (winterDays / 90) * 100;
+            }
+
+            document.getElementById('season-name').innerText = `${seasonName} [${Math.floor(seasonProgress)}%]`;
+            document.getElementById('season-progress').style.width = `${seasonProgress}%`;
+
+            requestAnimationFrame(updateWidget);
+        }
+
+        requestAnimationFrame(updateWidget);
+    </script>
+</body>
+</html>
